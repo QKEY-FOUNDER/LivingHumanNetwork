@@ -23,7 +23,7 @@
   "nodes": [
     {
       "id": "node_001",
-      "label": "Self",
+      "label": "Mihail",
       "category": "human",
       "origin": {
         "start": "YYYY-MM-DD",
@@ -40,7 +40,7 @@
     },
     {
       "id": "node_002",
-      "label": "Parent",
+      "label": "Natalia",
       "category": "human",
       "origin": {
         "start": "YYYY-MM-DD",
