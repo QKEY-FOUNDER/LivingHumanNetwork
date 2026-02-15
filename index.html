@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v3.2 — Structural Influence Layer</title>
+<title>LivingHumanNetwork v3.3 — Structural Resilience Layer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 body {
@@ -10,18 +10,15 @@ body {
     font-family: Arial, sans-serif;
     background: #d8cfb3;
 }
-
 h2 {
     text-align: center;
     margin-top: 20px;
 }
-
 #metrics {
     text-align: center;
     margin-bottom: 10px;
     font-size: 14px;
 }
-
 svg {
     display: block;
     margin: auto;
@@ -30,7 +27,7 @@ svg {
 </head>
 <body>
 
-<h2>LivingHumanNetwork v3.2 — Structural Influence Layer</h2>
+<h2>LivingHumanNetwork v3.3 — Structural Resilience Layer</h2>
 <div id="metrics"></div>
 <svg width="900" height="600"></svg>
 
@@ -47,21 +44,20 @@ fetch('data/living-human-network-v2.1.json')
     const nodes = data.nodes.map(n => n.id);
     const edges = data.relationships;
 
-    // Degree centrality
+    // Degree
     const degree = {};
     nodes.forEach(n => degree[n] = 0);
     edges.forEach(e => {
-        degree[e.source] += 1;
-        degree[e.target] += 1;
+        degree[e.source]++;
+        degree[e.target]++;
     });
 
     const maxDegree = Math.max(...Object.values(degree));
-
     const radiusScale = d3.scaleLinear()
         .domain([0, maxDegree])
         .range([20, 60]);
 
-    // Build adjacency list
+    // Adjacency
     const adj = {};
     nodes.forEach(n => adj[n] = []);
     edges.forEach(e => {
@@ -69,7 +65,7 @@ fetch('data/living-human-network-v2.1.json')
         adj[e.target].push(e.source);
     });
 
-    // Betweenness centrality (Brandes simplified)
+    // Betweenness (Brandes simplified)
     const betweenness = {};
     nodes.forEach(v => betweenness[v] = 0);
 
@@ -115,18 +111,69 @@ fetch('data/living-human-network-v2.1.json')
             predecessors[w].forEach(v => {
                 delta[v] += (sigma[v] / sigma[w]) * (1 + delta[w]);
             });
-            if (w !== s) {
-                betweenness[w] += delta[w];
-            }
+            if (w !== s) betweenness[w] += delta[w];
         }
-
     });
 
     const maxBetween = Math.max(...Object.values(betweenness));
-
     const colorScale = d3.scaleLinear()
         .domain([0, maxBetween])
-        .range(["#6baed6", "#cb181d"]); // blue → red
+        .range(["#6baed6", "#cb181d"]);
+
+    // Clustering coefficient
+    function clusteringCoefficient(node) {
+        const neighbors = adj[node];
+        const k = neighbors.length;
+        if (k < 2) return 0;
+
+        let links = 0;
+        for (let i = 0; i < k; i++) {
+            for (let j = i + 1; j < k; j++) {
+                if (adj[neighbors[i]].includes(neighbors[j])) {
+                    links++;
+                }
+            }
+        }
+        return (2 * links) / (k * (k - 1));
+    }
+
+    const clusteringValues = nodes.map(n => clusteringCoefficient(n));
+    const avgClustering = (
+        clusteringValues.reduce((a,b)=>a+b,0) / nodes.length
+    ).toFixed(3);
+
+    // Robustness test
+    const mostCentral = nodes.reduce((a,b) =>
+        betweenness[a] > betweenness[b] ? a : b
+    );
+
+    function countComponents(excludeNode = null) {
+        const visited = new Set();
+        let components = 0;
+
+        nodes.forEach(n => {
+            if (n !== excludeNode && !visited.has(n)) {
+                components++;
+                const stack = [n];
+                visited.add(n);
+
+                while(stack.length > 0) {
+                    const v = stack.pop();
+                    adj[v].forEach(w => {
+                        if (w !== excludeNode && !visited.has(w)) {
+                            visited.add(w);
+                            stack.push(w);
+                        }
+                    });
+                }
+            }
+        });
+
+        return components;
+    }
+
+    const componentsBefore = countComponents();
+    const componentsAfter = countComponents(mostCentral);
 
     const n = nodes.length;
     const m = edges.length;
@@ -134,12 +181,13 @@ fetch('data/living-human-network-v2.1.json')
     const avgDegree = (Object.values(degree).reduce((a,b)=>a+b,0)/n).toFixed(2);
 
     document.getElementById("metrics").innerHTML =
-        `Nodes: ${n} | Edges: ${m} | Avg Degree: ${avgDegree} | Density: ${density}`;
+        `Nodes: ${n} | Edges: ${m} | Avg Degree: ${avgDegree} | Density: ${density}
+         | Avg Clustering: ${avgClustering}
+         | Components: ${componentsBefore}
+         | Components After Removing Most Central (${mostCentral}): ${componentsAfter}`;
 
     const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(edges)
-            .id(d => d.id)
-            .distance(150))
+        .force("link", d3.forceLink(edges).id(d => d.id).distance(150))
         .force("charge", d3.forceManyBody().strength(-400))
         .force("center", d3.forceCenter(width/2, height/2));
 
@@ -159,11 +207,7 @@ fetch('data/living-human-network-v2.1.json')
         .attr("r", d => radiusScale(degree[d.id]))
         .attr("fill", d => colorScale(betweenness[d.id]))
         .attr("stroke", "#333")
-        .attr("stroke-width", 2)
-        .call(d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended));
+        .attr("stroke-width", 2);
 
     const labels = svg.append("g")
         .selectAll("text")
@@ -190,23 +234,6 @@ fetch('data/living-human-network-v2.1.json')
             .attr("x", d => d.x)
             .attr("y", d => d.y + 4);
     });
-
-    function dragstarted(event, d) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-    }
-
-    function dragged(event, d) {
-        d.fx = event.x;
-        d.fy = event.y;
-    }
-
-    function dragended(event, d) {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-    }
 
 });
 </script>
