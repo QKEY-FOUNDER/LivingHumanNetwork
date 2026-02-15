@@ -11,80 +11,99 @@ body {
     font-family: Arial, sans-serif;
 }
 
-#container {
-    padding: 40px;
+#title {
+    padding: 20px;
+    text-align: center;
+    font-size: 24px;
 }
 
-.node {
-    background: linear-gradient(to bottom, #f7e08a, #d4af37, #b8860b);
-    padding: 10px 15px;
-    margin: 10px 0;
-    border-radius: 8px;
-    display: inline-block;
-    border: 1px solid #8c6a00;
-}
-
-.relation {
-    margin: 6px 0;
-    font-size: 14px;
+svg {
+    display: block;
+    margin: 0 auto;
+    background: #f2e6c9;
 }
 </style>
 </head>
 
 <body>
 
-<div id="container">
-    <h1>LivingHumanNetwork v2.1</h1>
+<div id="title">LivingHumanNetwork v2.1 — Graph View</div>
 
-    <h2>Nodes</h2>
-    <div id="nodes"></div>
-
-    <h2>Relationships</h2>
-    <div id="relationships"></div>
-</div>
+<svg id="network" width="900" height="600"></svg>
 
 <script>
 fetch('data/living-human-network-v2.1.json')
-    .then(response => response.json())
-    .then(data => {
+.then(response => response.json())
+.then(data => {
 
-        const nodesContainer = document.getElementById('nodes');
-        const relationshipsContainer = document.getElementById('relationships');
+    const svg = document.getElementById("network");
+    const width = svg.clientWidth;
+    const height = svg.clientHeight;
 
-        // Render Nodes
-        data.nodes.forEach(node => {
-            const div = document.createElement('div');
-            div.className = 'node';
-            div.id = node.id;
-            div.innerHTML = "<strong>" + node.label + "</strong> (" + node.category + ")";
-            nodesContainer.appendChild(div);
-        });
+    const centerX = width / 2;
+    const centerY = height / 2;
 
-        // Render Relationships
-        data.relationships.forEach(rel => {
-            const relationDiv = document.createElement('div');
-            relationDiv.className = 'relation';
+    const radius = 200;
+    const nodePositions = {};
 
-            const sourceNode = data.nodes.find(n => n.id === rel.source);
-            const targetNode = data.nodes.find(n => n.id === rel.target);
+    // Position nodes in circular layout
+    data.nodes.forEach((node, index) => {
+        const angle = (index / data.nodes.length) * 2 * Math.PI;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
 
-            const sourceLabel = sourceNode ? sourceNode.label : rel.source;
-            const targetLabel = targetNode ? targetNode.label : rel.target;
-
-            const weightPercent = Math.round(rel.weight * 100);
-
-            relationDiv.innerHTML =
-                "<strong>" + sourceLabel + "</strong> → <strong>" + targetLabel + "</strong>" +
-                " | type: " + rel.type +
-                " | influence: " + weightPercent + "%";
-
-            relationshipsContainer.appendChild(relationDiv);
-        });
-
-    })
-    .catch(error => {
-        console.error('Error loading JSON:', error);
+        nodePositions[node.id] = { x, y };
     });
+
+    // Draw relationships (lines first so they stay behind nodes)
+    data.relationships.forEach(rel => {
+        const sourcePos = nodePositions[rel.source];
+        const targetPos = nodePositions[rel.target];
+
+        if (sourcePos && targetPos) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+
+            line.setAttribute("x1", sourcePos.x);
+            line.setAttribute("y1", sourcePos.y);
+            line.setAttribute("x2", targetPos.x);
+            line.setAttribute("y2", targetPos.y);
+
+            line.setAttribute("stroke", "#444");
+            line.setAttribute("stroke-width", rel.weight * 5);
+
+            svg.appendChild(line);
+        }
+    });
+
+    // Draw nodes
+    data.nodes.forEach(node => {
+        const pos = nodePositions[node.id];
+
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", pos.x);
+        circle.setAttribute("cy", pos.y);
+        circle.setAttribute("r", 30);
+        circle.setAttribute("fill", "gold");
+        circle.setAttribute("stroke", "#8c6a00");
+        circle.setAttribute("stroke-width", "2");
+
+        svg.appendChild(circle);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", pos.x);
+        text.setAttribute("y", pos.y + 5);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("font-weight", "bold");
+        text.textContent = node.label;
+
+        svg.appendChild(text);
+    });
+
+})
+.catch(error => {
+    console.error("Error loading JSON:", error);
+});
 </script>
 
 </body>
