@@ -20,89 +20,102 @@ body {
 svg {
     display: block;
     margin: 0 auto;
-    background: #f2e6c9;
 }
 </style>
 </head>
 
 <body>
 
-<div id="title">LivingHumanNetwork v2.1 — Graph View</div>
+<div id="title">LivingHumanNetwork v2.1 — Adaptive Graph</div>
 
-<svg id="network" width="900" height="600"></svg>
+<svg width="900" height="600"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
 
 <script>
+const width = 900;
+const height = 600;
+
+const svg = d3.select("svg");
+
 fetch('data/living-human-network-v2.1.json')
 .then(response => response.json())
 .then(data => {
 
-    const svg = document.getElementById("network");
-    const width = svg.clientWidth;
-    const height = svg.clientHeight;
+    const simulation = d3.forceSimulation(data.nodes)
+        .force("link", d3.forceLink(data.relationships)
+            .id(d => d.id)
+            .distance(150)
+        )
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2));
 
-    const centerX = width / 2;
-    const centerY = height / 2;
+    const link = svg.append("g")
+        .selectAll("line")
+        .data(data.relationships)
+        .enter()
+        .append("line")
+        .attr("stroke", "#444")
+        .attr("stroke-width", d => d.weight * 5);
 
-    const radius = 200;
-    const nodePositions = {};
+    const node = svg.append("g")
+        .selectAll("circle")
+        .data(data.nodes)
+        .enter()
+        .append("circle")
+        .attr("r", 30)
+        .attr("fill", "gold")
+        .attr("stroke", "#8c6a00")
+        .attr("stroke-width", 2)
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended)
+        );
 
-    // Position nodes in circular layout
-    data.nodes.forEach((node, index) => {
-        const angle = (index / data.nodes.length) * 2 * Math.PI;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
+    const labels = svg.append("g")
+        .selectAll("text")
+        .data(data.nodes)
+        .enter()
+        .append("text")
+        .text(d => d.label)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 12)
+        .attr("font-weight", "bold");
 
-        nodePositions[node.id] = { x, y };
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+
+        node
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
+
+        labels
+            .attr("x", d => d.x)
+            .attr("y", d => d.y + 4);
     });
 
-    // Draw relationships (lines first so they stay behind nodes)
-    data.relationships.forEach(rel => {
-        const sourcePos = nodePositions[rel.source];
-        const targetPos = nodePositions[rel.target];
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
 
-        if (sourcePos && targetPos) {
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
 
-            line.setAttribute("x1", sourcePos.x);
-            line.setAttribute("y1", sourcePos.y);
-            line.setAttribute("x2", targetPos.x);
-            line.setAttribute("y2", targetPos.y);
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
 
-            line.setAttribute("stroke", "#444");
-            line.setAttribute("stroke-width", rel.weight * 5);
-
-            svg.appendChild(line);
-        }
-    });
-
-    // Draw nodes
-    data.nodes.forEach(node => {
-        const pos = nodePositions[node.id];
-
-        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        circle.setAttribute("cx", pos.x);
-        circle.setAttribute("cy", pos.y);
-        circle.setAttribute("r", 30);
-        circle.setAttribute("fill", "gold");
-        circle.setAttribute("stroke", "#8c6a00");
-        circle.setAttribute("stroke-width", "2");
-
-        svg.appendChild(circle);
-
-        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        text.setAttribute("x", pos.x);
-        text.setAttribute("y", pos.y + 5);
-        text.setAttribute("text-anchor", "middle");
-        text.setAttribute("font-size", "12");
-        text.setAttribute("font-weight", "bold");
-        text.textContent = node.label;
-
-        svg.appendChild(text);
-    });
-
-})
-.catch(error => {
-    console.error("Error loading JSON:", error);
 });
 </script>
 
