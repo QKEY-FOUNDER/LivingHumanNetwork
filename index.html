@@ -1,49 +1,35 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>LivingHumanNetwork</title>
-<style>
-body {
-    margin: 0;
-    background: #f2e6c9;
-    font-family: Arial, sans-serif;
-}
-#container {
-    padding: 40px;
-}
-.node {
-    background: #d4af37;
-    padding: 10px 15px;
-    margin: 10px 0;
-    border-radius: 8px;
-    display: inline-block;
-}
-</style>
-</head>
-<body>
-
-<div id="container">
-    <h1>LivingHumanNetwork v2.1</h1>
-    <div id="nodes"></div>
-</div>
-
 <script>
 fetch('data/living-human-network-v2.1.json')
     .then(response => response.json())
     .then(data => {
+
         const nodesContainer = document.getElementById('nodes');
+
+        // Render Nodes
         data.nodes.forEach(node => {
             const div = document.createElement('div');
             div.className = 'node';
             div.innerHTML = "<strong>" + node.label + "</strong> (" + node.category + ")";
+            div.id = node.id;
             nodesContainer.appendChild(div);
         });
+
+        // Render Relationships
+        const relationsTitle = document.createElement('h2');
+        relationsTitle.innerText = "Relationships";
+        nodesContainer.appendChild(relationsTitle);
+
+        data.relationships.forEach(rel => {
+            const relationDiv = document.createElement('div');
+            relationDiv.style.margin = "5px 0";
+            relationDiv.innerHTML =
+                rel.source + " → " + rel.target +
+                " (" + rel.type + ", weight: " + rel.weight + ")";
+            nodesContainer.appendChild(relationDiv);
+        });
+
     })
     .catch(error => {
         console.error('Error loading JSON:', error);
     });
 </script>
-
-</body>
-</html>
