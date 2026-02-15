@@ -26,7 +26,7 @@ svg {
 
 <body>
 
-<div id="title">LivingHumanNetwork v2.1 — Louvain Communities</div>
+<div id="title">LivingHumanNetwork v2.1 — Centrality + Louvain</div>
 
 <svg width="900" height="600"></svg>
 
@@ -54,7 +54,23 @@ fetch('data/living-human-network-v2.1.json')
         graph.addEdge(rel.source, rel.target);
     });
 
+    // Louvain communities
     const communities = louvain(graph);
+
+    // Calcular grau
+    const degreeCount = {};
+    data.nodes.forEach(node => degreeCount[node.id] = 0);
+
+    data.relationships.forEach(rel => {
+        degreeCount[rel.source] += 1;
+        degreeCount[rel.target] += 1;
+    });
+
+    const maxDegree = Math.max(...Object.values(degreeCount));
+
+    const radiusScale = d3.scaleLinear()
+        .domain([0, maxDegree])
+        .range([20, 60]);
 
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -72,14 +88,14 @@ fetch('data/living-human-network-v2.1.json')
         .enter()
         .append("line")
         .attr("stroke", "#999")
-        .attr("stroke-width", 2);
+        .attr("stroke-width", d => d.weight ? d.weight * 5 : 2);
 
     const node = svg.append("g")
         .selectAll("circle")
         .data(data.nodes)
         .enter()
         .append("circle")
-        .attr("r", 30)
+        .attr("r", d => radiusScale(degreeCount[d.id]))
         .attr("fill", d => color(communities[d.id]))
         .attr("stroke", "#333")
         .attr("stroke-width", 2)
