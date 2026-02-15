@@ -1,31 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LivingHumanNetwork</title>
+
+<style>
+body {
+    margin: 0;
+    background: #f2e6c9;
+    font-family: Arial, sans-serif;
+}
+
+#container {
+    padding: 40px;
+}
+
+.node {
+    background: linear-gradient(to bottom, #f7e08a, #d4af37, #b8860b);
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid #8c6a00;
+}
+
+.relation {
+    margin: 5px 0;
+    font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+    <h1>LivingHumanNetwork v2.1</h1>
+    <h2>Nodes</h2>
+    <div id="nodes"></div>
+    <h2>Relationships</h2>
+    <div id="relationships"></div>
+</div>
+
 <script>
 fetch('data/living-human-network-v2.1.json')
     .then(response => response.json())
     .then(data => {
 
         const nodesContainer = document.getElementById('nodes');
+        const relationshipsContainer = document.getElementById('relationships');
 
         // Render Nodes
         data.nodes.forEach(node => {
             const div = document.createElement('div');
             div.className = 'node';
-            div.innerHTML = "<strong>" + node.label + "</strong> (" + node.category + ")";
             div.id = node.id;
+            div.innerHTML = "<strong>" + node.label + "</strong> (" + node.category + ")";
             nodesContainer.appendChild(div);
         });
 
         // Render Relationships
-        const relationsTitle = document.createElement('h2');
-        relationsTitle.innerText = "Relationships";
-        nodesContainer.appendChild(relationsTitle);
-
         data.relationships.forEach(rel => {
             const relationDiv = document.createElement('div');
-            relationDiv.style.margin = "5px 0";
+            relationDiv.className = 'relation';
+
+            const sourceNode = data.nodes.find(n => n.id === rel.source);
+            const targetNode = data.nodes.find(n => n.id === rel.target);
+
+            const sourceLabel = sourceNode ? sourceNode.label : rel.source;
+            const targetLabel = targetNode ? targetNode.label : rel.target;
+
             relationDiv.innerHTML =
-                rel.source + " → " + rel.target +
-                " (" + rel.type + ", weight: " + rel.weight + ")";
-            nodesContainer.appendChild(relationDiv);
+                sourceLabel + " → " + targetLabel +
+                " | type: " + rel.type +
+                " | weight: " + rel.weight;
+
+            relationshipsContainer.appendChild(relationDiv);
         });
 
     })
@@ -33,3 +82,6 @@ fetch('data/living-human-network-v2.1.json')
         console.error('Error loading JSON:', error);
     });
 </script>
+
+</body>
+</html>
