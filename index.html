@@ -1,57 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork</title>
-
+<title>LivingHumanNetwork v3.1 — Stable Analytical View</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
-
 <style>
 body {
     margin: 0;
-    background: #f2e6c9;
     font-family: Arial, sans-serif;
+    background: #d8cfb3;
 }
 
-#title {
-    padding: 20px;
+h2 {
     text-align: center;
-    font-size: 24px;
+    margin-top: 20px;
 }
 
 #metrics {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     font-size: 14px;
 }
 
 svg {
     display: block;
-    margin: 0 auto;
+    margin: auto;
+    background: transparent;
 }
 </style>
 </head>
-
 <body>
 
-<div id="title">LivingHumanNetwork v3.1 — Stable Analytical View</div>
+<h2>LivingHumanNetwork v3.1 — Stable Analytical View</h2>
 <div id="metrics"></div>
+
 <svg width="900" height="600"></svg>
 
 <script>
 
 const width = 900;
 const height = 600;
-
 const svg = d3.select("svg");
 
 fetch('data/living-human-network-v2.1.json')
 .then(response => response.json())
 .then(data => {
 
-    // Grau
     const degree = {};
     data.nodes.forEach(n => degree[n.id] = 0);
+
     data.relationships.forEach(r => {
         degree[r.source] += 1;
         degree[r.target] += 1;
@@ -63,10 +60,34 @@ fetch('data/living-human-network-v2.1.json')
         .domain([0, maxDegree])
         .range([20, 60]);
 
-    // Métricas simples
+    // Detect connected components (communities)
+    const visited = new Set();
+    const components = {};
+    let componentId = 0;
+
+    function dfs(nodeId) {
+        visited.add(nodeId);
+        components[nodeId] = componentId;
+
+        data.relationships.forEach(r => {
+            if (r.source === nodeId && !visited.has(r.target)) dfs(r.target);
+            if (r.target === nodeId && !visited.has(r.source)) dfs(r.source);
+        });
+    }
+
+    data.nodes.forEach(n => {
+        if (!visited.has(n.id)) {
+            dfs(n.id);
+            componentId++;
+        }
+    });
+
+    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Metrics
     const n = data.nodes.length;
     const m = data.relationships.length;
-    const density = ((2*m)/(n*(n-1))).toFixed(3);
+    const density = n > 1 ? ((2*m)/(n*(n-1))).toFixed(3) : 0;
     const avgDegree = (Object.values(degree).reduce((a,b)=>a+b,0)/n).toFixed(2);
 
     document.getElementById("metrics").innerHTML =
@@ -93,7 +114,7 @@ fetch('data/living-human-network-v2.1.json')
         .enter()
         .append("circle")
         .attr("r", d => radiusScale(degree[d.id]))
-        .attr("fill", "#d4a017")
+        .attr("fill", d => colorScale(components[d.id]))
         .attr("stroke", "#333")
         .attr("stroke-width", 2)
         .call(d3.drag()
@@ -112,6 +133,7 @@ fetch('data/living-human-network-v2.1.json')
         .attr("font-weight", "bold");
 
     simulation.on("tick", () => {
+
         link
             .attr("x1", d => d.source.x)
             .attr("y1", d => d.source.y)
@@ -145,7 +167,7 @@ fetch('data/living-human-network-v2.1.json')
     }
 
 });
-</script>
 
+</script>
 </body>
 </html>
