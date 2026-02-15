@@ -1,0 +1,104 @@
+{
+  "version": "2.1",
+  "model": "ConsciousInfluenceGraph",
+  "created_at": "2026-02-15",
+  "scope": "personal",
+  "governance": {
+    "framework": "AdaptiveGovernanceLayer",
+    "core_principle": "AdaptiveContinuityPrinciple",
+    "evaluation_protocol": [],
+    "decision_history": [
+      {
+        "timestamp": "2026-02-15",
+        "selected_model": "Consciousness-centric",
+        "rejected_models": [
+          "Human-centric",
+          "Entity-centric"
+        ],
+        "reason": "Maximized cross-temporal adaptability across historical, present and hypothetical future realities."
+      }
+    ],
+    "revision_threshold": 0.75
+  },
+  "nodes": [
+    {
+      "id": "node_001",
+      "label": "Self",
+      "category": "human",
+      "origin": {
+        "start": "YYYY-MM-DD",
+        "end": null,
+        "context": "biological birth"
+      },
+      "attributes": {
+        "intensity": 1.0,
+        "stability": 1.0,
+        "visibility": 1.0,
+        "custom": {}
+      },
+      "metadata": {}
+    },
+    {
+      "id": "node_002",
+      "label": "Parent",
+      "category": "human",
+      "origin": {
+        "start": "YYYY-MM-DD",
+        "end": null,
+        "context": "biological birth"
+      },
+      "attributes": {
+        "intensity": 0.9,
+        "stability": 0.9,
+        "visibility": 0.8,
+        "custom": {}
+      },
+      "metadata": {}
+    },
+    {
+      "id": "node_003",
+      "label": "Mentor",
+      "category": "human",
+      "origin": {
+        "start": null,
+        "end": null,
+        "context": "intellectual influence"
+      },
+      "attributes": {
+        "intensity": 0.7,
+        "stability": 0.6,
+        "visibility": 0.6,
+        "custom": {}
+      },
+      "metadata": {}
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel_001",
+      "source": "node_002",
+      "target": "node_001",
+      "type": "biological",
+      "direction": "unidirectional",
+      "weight": 0.95,
+      "temporal": {
+        "start": "YYYY-MM-DD",
+        "end": null
+      },
+      "context": {}
+    },
+    {
+      "id": "rel_002",
+      "source": "node_003",
+      "target": "node_001",
+      "type": "intellectual",
+      "direction": "unidirectional",
+      "weight": 0.7,
+      "temporal": {
+        "start": null,
+        "end": null
+      },
+      "context": {}
+    }
+  ]
+}
