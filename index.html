@@ -7,14 +7,43 @@
 body {
     margin: 0;
     background: #f2e6c9;
-    display: flex;
-    justify-content: center;
+    font-family: Arial, sans-serif;
+}
+#container {
+    padding: 40px;
+}
+.node {
+    background: #d4af37;
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    display: inline-block;
 }
 </style>
 </head>
 <body>
 
-<object type="image/svg+xml" data="assets/svg/living-network.svg" width="100%"></object>
+<div id="container">
+    <h1>LivingHumanNetwork v2.1</h1>
+    <div id="nodes"></div>
+</div>
+
+<script>
+fetch('data/living-human-network-v2.1.json')
+    .then(response => response.json())
+    .then(data => {
+        const nodesContainer = document.getElementById('nodes');
+        data.nodes.forEach(node => {
+            const div = document.createElement('div');
+            div.className = 'node';
+            div.innerHTML = "<strong>" + node.label + "</strong> (" + node.category + ")";
+            nodesContainer.appendChild(div);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading JSON:', error);
+    });
+</script>
 
 </body>
 </html>
