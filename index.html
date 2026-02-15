@@ -2,186 +2,193 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v4.0 — Temporal Evolution</title>
+<title>LivingHumanNetwork v4.1 — Hybrid Analytical Engine</title>
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #d8ccb0;
-  text-align: center;
-}
-h1 { margin-top: 20px; }
-#controls { margin: 10px; }
-svg { background: #d8ccb0; }
+body { margin:0; font-family:Arial; background:#d8cfb0; }
+h2 { text-align:center; margin:20px 0 5px; }
+.metrics { text-align:center; font-size:12px; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
-<h1>LivingHumanNetwork v4.0 — Temporal Evolution</h1>
-
-<div id="controls">
-  <input type="range" id="timeSlider" min="0" max="1" step="1" value="0">
-  <span id="timeLabel">t = 0</span>
-</div>
-
-<div id="metrics"></div>
-
-<svg id="network" width="800" height="600"></svg>
+<h2>LivingHumanNetwork v4.1 — Hybrid Analytical Engine</h2>
+<div class="metrics" id="metrics"></div>
+<svg id="network" width="100%" height="600"></svg>
 
 <script>
 
-const timeline = [
-{
-  t:0,
-  nodes:[
-    {id:"001",label:"Mihail"},
-    {id:"002",label:"Natalia"}
+const data = {
+  nodes: [
+    { id: "001", name: "Mihail", time: 0 },
+    { id: "002", name: "Natalia", time: 0 }
   ],
-  edges:[
-    {source:"002",target:"001"}
+  links: [
+    { source: "001", target: "002", time: 0 }
   ]
-},
-{
-  t:1,
-  nodes:[
-    {id:"001",label:"Mihail"},
-    {id:"002",label:"Natalia"},
-    {id:"003",label:"Mentor"}
-  ],
-  edges:[
-    {source:"002",target:"001"},
-    {source:"003",target:"001"}
-  ]
+};
+
+function buildGraph(nodes, links){
+  const adj = {};
+  nodes.forEach(n => adj[n.id] = []);
+  links.forEach(l => {
+    adj[l.source].push(l.target);
+    adj[l.target].push(l.source);
+  });
+  return adj;
 }
-];
 
-const slider = document.getElementById("timeSlider");
-slider.max = timeline.length - 1;
-
-slider.addEventListener("input", () => {
-  document.getElementById("timeLabel").innerText = "t = " + slider.value;
-  render(parseInt(slider.value));
-});
-
-function calculateMetrics(nodes, edges) {
+function computeDegree(adj){
   const degree = {};
-  nodes.forEach(n => degree[n.id] = 0);
-  edges.forEach(e => {
-    degree[e.source]++;
-    degree[e.target]++;
-  });
-
-  const n = nodes.length;
-  const m = edges.length;
-  const avgDegree = n > 0 ? (2*m)/n : 0;
-  const density = n > 1 ? (2*m)/(n*(n-1)) : 0;
-
-  return {degree, avgDegree, density};
+  Object.keys(adj).forEach(id => degree[id] = adj[id].length);
+  return degree;
 }
 
-function calculateBetweenness(nodes, edges) {
-  const score = {};
-  nodes.forEach(n => score[n.id] = 0);
+// Brandes Simplified for small graphs
+function computeBetweenness(nodes, adj){
 
-  nodes.forEach(a => {
-    nodes.forEach(b => {
-      if(a.id !== b.id) {
-        edges.forEach(e => {
-          if(e.source === a.id && e.target === b.id) {
-            score[a.id] += 1;
-          }
-        });
-      }
+  const CB = {};
+  nodes.forEach(n => CB[n.id] = 0);
+
+  if(nodes.length < 3) return CB;
+
+  nodes.forEach(s => {
+
+    const S = [];
+    const P = {};
+    const sigma = {};
+    const d = {};
+    const Q = [];
+
+    nodes.forEach(v => {
+      P[v.id] = [];
+      sigma[v.id] = 0;
+      d[v.id] = -1;
     });
+
+    sigma[s.id] = 1;
+    d[s.id] = 0;
+    Q.push(s.id);
+
+    while(Q.length){
+      const v = Q.shift();
+      S.push(v);
+
+      adj[v].forEach(w => {
+        if(d[w] < 0){
+          Q.push(w);
+          d[w] = d[v] + 1;
+        }
+        if(d[w] === d[v] + 1){
+          sigma[w] += sigma[v];
+          P[w].push(v);
+        }
+      });
+    }
+
+    const delta = {};
+    nodes.forEach(v => delta[v.id] = 0);
+
+    while(S.length){
+      const w = S.pop();
+      P[w].forEach(v => {
+        delta[v] += (sigma[v]/sigma[w]) * (1 + delta[w]);
+      });
+      if(w !== s.id){
+        CB[w] += delta[w];
+      }
+    }
+
   });
 
-  return score;
+  // normalização
+  const norm = 1 / ((nodes.length-1)*(nodes.length-2));
+  Object.keys(CB).forEach(id => CB[id] *= norm);
+
+  return CB;
 }
 
-function normalize(values) {
-  const arr = Object.values(values);
-  const max = Math.max(...arr);
-  if(max === 0) return values;
-  const normalized = {};
-  for(let k in values) {
-    normalized[k] = values[k] / max;
-  }
-  return normalized;
-}
+function render(){
 
-function render(tIndex) {
-
-  const data = timeline[tIndex];
   const svg = document.getElementById("network");
   svg.innerHTML = "";
 
-  const {degree, avgDegree, density} = calculateMetrics(data.nodes, data.edges);
-  let btw = calculateBetweenness(data.nodes, data.edges);
-  btw = normalize(btw);
+  const adj = buildGraph(data.nodes, data.links);
+  const degree = computeDegree(adj);
+  const betweenness = computeBetweenness(data.nodes, adj);
 
-  const centerX = 400;
-  const centerY = 300;
-  const radius = 160;
+  const maxDegree = Math.max(...Object.values(degree));
+  const maxBet = Math.max(...Object.values(betweenness));
 
-  data.nodes.forEach((node, i) => {
-    const angle = (i / data.nodes.length) * 2 * Math.PI;
-    node.x = centerX + radius * Math.cos(angle);
-    node.y = centerY + radius * Math.sin(angle);
+  const width = svg.clientWidth;
+  const height = svg.clientHeight;
+
+  const cx = width/2;
+  const spacing = 200;
+
+  const positions = {};
+  data.nodes.forEach((n,i)=>{
+    positions[n.id] = {
+      x: cx + (i===0 ? -spacing/2 : spacing/2),
+      y: height/2
+    };
   });
 
-  data.edges.forEach(e => {
-    const source = data.nodes.find(n => n.id === e.source);
-    const target = data.nodes.find(n => n.id === e.target);
-
+  data.links.forEach(l=>{
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    line.setAttribute("x1", source.x);
-    line.setAttribute("y1", source.y);
-    line.setAttribute("x2", target.x);
-    line.setAttribute("y2", target.y);
+    line.setAttribute("x1", positions[l.source].x);
+    line.setAttribute("y1", positions[l.source].y);
+    line.setAttribute("x2", positions[l.target].x);
+    line.setAttribute("y2", positions[l.target].y);
     line.setAttribute("stroke","#555");
     line.setAttribute("stroke-width","2");
     svg.appendChild(line);
   });
 
-  data.nodes.forEach(node => {
+  data.nodes.forEach(n=>{
+
+    const r = 20 + (degree[n.id]/maxDegree)*40;
+
+    let color = "#2e6da4";
+    if(maxBet > 0){
+      const intensity = betweenness[n.id]/maxBet;
+      const red = Math.floor(255*intensity);
+      const blue = Math.floor(255*(1-intensity));
+      color = `rgb(${red},0,${blue})`;
+    }
 
     const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
-
-    const size = 25 + (degree[node.id] * 18);
-
-    const influence = btw[node.id] || 0;
-    const red = Math.floor(255 * influence);
-    const blue = 180 - Math.floor(150 * influence);
-
-    const color = `rgb(${red},50,${blue})`;
-
-    circle.setAttribute("cx", node.x);
-    circle.setAttribute("cy", node.y);
-    circle.setAttribute("r", size);
+    circle.setAttribute("cx", positions[n.id].x);
+    circle.setAttribute("cy", positions[n.id].y);
+    circle.setAttribute("r", r);
     circle.setAttribute("fill", color);
-    circle.setAttribute("stroke","#333");
+    circle.setAttribute("stroke","#222");
     circle.setAttribute("stroke-width","2");
 
     svg.appendChild(circle);
 
-    const text = document.createElementNS("http://www.w3.org/2000/svg","text");
-    text.setAttribute("x", node.x);
-    text.setAttribute("y", node.y+5);
-    text.setAttribute("text-anchor","middle");
-    text.setAttribute("font-size","12");
-    text.setAttribute("fill","#000");
-    text.textContent = node.label;
-    svg.appendChild(text);
+    const label = document.createElementNS("http://www.w3.org/2000/svg","text");
+    label.setAttribute("x", positions[n.id].x);
+    label.setAttribute("y", positions[n.id].y+4);
+    label.setAttribute("text-anchor","middle");
+    label.setAttribute("fill","#fff");
+    label.setAttribute("font-size","12");
+    label.textContent = n.name;
+
+    svg.appendChild(label);
+
   });
 
-  document.getElementById("metrics").innerHTML =
+  document.getElementById("metrics").innerText =
     "Nodes: " + data.nodes.length +
-    " | Edges: " + data.edges.length +
-    " | Avg Degree: " + avgDegree.toFixed(2) +
-    " | Density: " + density.toFixed(3);
+    " | Edges: " + data.links.length +
+    " | Avg Degree: " +
+    (Object.values(degree).reduce((a,b)=>a+b,0)/data.nodes.length).toFixed(2) +
+    " | Density: " +
+    ( (2*data.links.length)/(data.nodes.length*(data.nodes.length-1)) ).toFixed(3);
+
 }
 
-render(0);
+render();
 
 </script>
 
