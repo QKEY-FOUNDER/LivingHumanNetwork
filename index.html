@@ -17,6 +17,12 @@ body {
     font-size: 24px;
 }
 
+#metrics {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
 svg {
     display: block;
     margin: 0 auto;
@@ -26,8 +32,8 @@ svg {
 
 <body>
 
-<div id="title">LivingHumanNetwork v2.1 — Centrality + Louvain</div>
-
+<div id="title">LivingHumanNetwork v3.0 — Analytical View</div>
+<div id="metrics"></div>
 <svg width="900" height="600"></svg>
 
 <script type="module">
@@ -35,6 +41,7 @@ svg {
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import Graph from "https://cdn.jsdelivr.net/npm/graphology@0.25.1/+esm";
 import louvain from "https://cdn.jsdelivr.net/npm/graphology-communities-louvain@2.0.2/+esm";
+import betweenness from "https://cdn.jsdelivr.net/npm/graphology-metrics/centrality/betweenness/+esm";
 
 const width = 900;
 const height = 600;
@@ -46,21 +53,15 @@ fetch('data/living-human-network-v2.1.json')
 
     const graph = new Graph();
 
-    data.nodes.forEach(node => {
-        graph.addNode(node.id);
-    });
+    data.nodes.forEach(node => graph.addNode(node.id));
+    data.relationships.forEach(rel => graph.addEdge(rel.source, rel.target));
 
-    data.relationships.forEach(rel => {
-        graph.addEdge(rel.source, rel.target);
-    });
-
-    // Louvain communities
+    // Comunidades
     const communities = louvain(graph);
 
-    // Calcular grau
+    // Grau
     const degreeCount = {};
     data.nodes.forEach(node => degreeCount[node.id] = 0);
-
     data.relationships.forEach(rel => {
         degreeCount[rel.source] += 1;
         degreeCount[rel.target] += 1;
@@ -71,6 +72,43 @@ fetch('data/living-human-network-v2.1.json')
     const radiusScale = d3.scaleLinear()
         .domain([0, maxDegree])
         .range([20, 60]);
+
+    // Betweenness centrality
+    const between = betweenness(graph);
+
+    // Métricas globais
+    const n = data.nodes.length;
+    const m = data.relationships.length;
+    const density = ((2 * m) / (n * (n - 1))).toFixed(4);
+    const avgDegree = (Object.values(degreeCount).reduce((a,b)=>a+b,0)/n).toFixed(2);
+    const modularity = louvain.modularity(graph, communities).toFixed(4);
+    const communityCount = new Set(Object.values(communities)).size;
+
+    // Ranking Top 3 Grau
+    const topDegree = Object.entries(degreeCount)
+        .sort((a,b)=>b[1]-a[1])
+        .slice(0,3);
+
+    // Ranking Top 3 Betweenness
+    const topBetween = Object.entries(between)
+        .sort((a,b)=>b[1]-a[1])
+        .slice(0,3);
+
+    const idToLabel = {};
+    data.nodes.forEach(n => idToLabel[n.id] = n.label);
+
+    document.getElementById("metrics").innerHTML = `
+        Nodes: ${n} |
+        Edges: ${m} |
+        Communities: ${communityCount} |
+        Avg Degree: ${avgDegree} |
+        Density: ${density} |
+        Modularity: ${modularity}
+        <br><br>
+        Top Degree: ${topDegree.map(d => idToLabel[d[0]] + " (" + d[1] + ")").join(" | ")}
+        <br>
+        Top Bridges: ${topBetween.map(d => idToLabel[d[0]] + " (" + d[1].toFixed(3) + ")").join(" | ")}
+    `;
 
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
@@ -149,7 +187,6 @@ fetch('data/living-human-network-v2.1.json')
     }
 
 });
-
 </script>
 
 </body>
