@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v3.1 — Stable Analytical View</title>
+<title>LivingHumanNetwork v3.2 — Structural Influence Layer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 body {
@@ -25,15 +25,13 @@ h2 {
 svg {
     display: block;
     margin: auto;
-    background: transparent;
 }
 </style>
 </head>
 <body>
 
-<h2>LivingHumanNetwork v3.1 — Stable Analytical View</h2>
+<h2>LivingHumanNetwork v3.2 — Structural Influence Layer</h2>
 <div id="metrics"></div>
-
 <svg width="900" height="600"></svg>
 
 <script>
@@ -46,12 +44,15 @@ fetch('data/living-human-network-v2.1.json')
 .then(response => response.json())
 .then(data => {
 
-    const degree = {};
-    data.nodes.forEach(n => degree[n.id] = 0);
+    const nodes = data.nodes.map(n => n.id);
+    const edges = data.relationships;
 
-    data.relationships.forEach(r => {
-        degree[r.source] += 1;
-        degree[r.target] += 1;
+    // Degree centrality
+    const degree = {};
+    nodes.forEach(n => degree[n] = 0);
+    edges.forEach(e => {
+        degree[e.source] += 1;
+        degree[e.target] += 1;
     });
 
     const maxDegree = Math.max(...Object.values(degree));
@@ -60,33 +61,75 @@ fetch('data/living-human-network-v2.1.json')
         .domain([0, maxDegree])
         .range([20, 60]);
 
-    // Detect connected components (communities)
-    const visited = new Set();
-    const components = {};
-    let componentId = 0;
-
-    function dfs(nodeId) {
-        visited.add(nodeId);
-        components[nodeId] = componentId;
-
-        data.relationships.forEach(r => {
-            if (r.source === nodeId && !visited.has(r.target)) dfs(r.target);
-            if (r.target === nodeId && !visited.has(r.source)) dfs(r.source);
-        });
-    }
-
-    data.nodes.forEach(n => {
-        if (!visited.has(n.id)) {
-            dfs(n.id);
-            componentId++;
-        }
+    // Build adjacency list
+    const adj = {};
+    nodes.forEach(n => adj[n] = []);
+    edges.forEach(e => {
+        adj[e.source].push(e.target);
+        adj[e.target].push(e.source);
     });
 
-    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    // Betweenness centrality (Brandes simplified)
+    const betweenness = {};
+    nodes.forEach(v => betweenness[v] = 0);
 
-    // Metrics
-    const n = data.nodes.length;
-    const m = data.relationships.length;
+    nodes.forEach(s => {
+
+        const stack = [];
+        const predecessors = {};
+        const sigma = {};
+        const dist = {};
+
+        nodes.forEach(v => {
+            predecessors[v] = [];
+            sigma[v] = 0;
+            dist[v] = -1;
+        });
+
+        sigma[s] = 1;
+        dist[s] = 0;
+
+        const queue = [s];
+
+        while(queue.length > 0) {
+            const v = queue.shift();
+            stack.push(v);
+
+            adj[v].forEach(w => {
+                if (dist[w] < 0) {
+                    queue.push(w);
+                    dist[w] = dist[v] + 1;
+                }
+                if (dist[w] === dist[v] + 1) {
+                    sigma[w] += sigma[v];
+                    predecessors[w].push(v);
+                }
+            });
+        }
+
+        const delta = {};
+        nodes.forEach(v => delta[v] = 0);
+
+        while(stack.length > 0) {
+            const w = stack.pop();
+            predecessors[w].forEach(v => {
+                delta[v] += (sigma[v] / sigma[w]) * (1 + delta[w]);
+            });
+            if (w !== s) {
+                betweenness[w] += delta[w];
+            }
+        }
+
+    });
+
+    const maxBetween = Math.max(...Object.values(betweenness));
+
+    const colorScale = d3.scaleLinear()
+        .domain([0, maxBetween])
+        .range(["#6baed6", "#cb181d"]); // blue → red
+
+    const n = nodes.length;
+    const m = edges.length;
     const density = n > 1 ? ((2*m)/(n*(n-1))).toFixed(3) : 0;
     const avgDegree = (Object.values(degree).reduce((a,b)=>a+b,0)/n).toFixed(2);
 
@@ -94,7 +137,7 @@ fetch('data/living-human-network-v2.1.json')
         `Nodes: ${n} | Edges: ${m} | Avg Degree: ${avgDegree} | Density: ${density}`;
 
     const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(data.relationships)
+        .force("link", d3.forceLink(edges)
             .id(d => d.id)
             .distance(150))
         .force("charge", d3.forceManyBody().strength(-400))
@@ -102,7 +145,7 @@ fetch('data/living-human-network-v2.1.json')
 
     const link = svg.append("g")
         .selectAll("line")
-        .data(data.relationships)
+        .data(edges)
         .enter()
         .append("line")
         .attr("stroke", "#999")
@@ -114,7 +157,7 @@ fetch('data/living-human-network-v2.1.json')
         .enter()
         .append("circle")
         .attr("r", d => radiusScale(degree[d.id]))
-        .attr("fill", d => colorScale(components[d.id]))
+        .attr("fill", d => colorScale(betweenness[d.id]))
         .attr("stroke", "#333")
         .attr("stroke-width", 2)
         .call(d3.drag()
@@ -133,7 +176,6 @@ fetch('data/living-human-network-v2.1.json')
         .attr("font-weight", "bold");
 
     simulation.on("tick", () => {
-
         link
             .attr("x1", d => d.source.x)
             .attr("y1", d => d.source.y)
@@ -167,7 +209,6 @@ fetch('data/living-human-network-v2.1.json')
     }
 
 });
-
 </script>
 </body>
 </html>
