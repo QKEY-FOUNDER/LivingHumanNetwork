@@ -30,22 +30,21 @@ svg {
 
 <svg width="900" height="600"></svg>
 
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="https://unpkg.com/graphology@0.25.1/dist/graphology.umd.min.js"></script>
-<script src="https://unpkg.com/graphology-communities-louvain@2.0.2/build/graphology-communities-louvain.min.js"></script>
+<script type="module">
 
-<script>
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+import Graph from "https://cdn.jsdelivr.net/npm/graphology@0.25.1/+esm";
+import louvain from "https://cdn.jsdelivr.net/npm/graphology-communities-louvain@2.0.2/+esm";
+
 const width = 900;
 const height = 600;
-
 const svg = d3.select("svg");
 
 fetch('data/living-human-network-v2.1.json')
 .then(response => response.json())
 .then(data => {
 
-    // Criar grafo Graphology
-    const graph = new graphology.Graph();
+    const graph = new Graph();
 
     data.nodes.forEach(node => {
         graph.addNode(node.id);
@@ -55,16 +54,8 @@ fetch('data/living-human-network-v2.1.json')
         graph.addEdge(rel.source, rel.target);
     });
 
-    // Calcular comunidades Louvain
     const communities = louvain(graph);
 
-    // Mapear comunidade por nó
-    const communityMap = {};
-    graph.forEachNode((node, attr) => {
-        communityMap[node] = communities[node];
-    });
-
-    // Escala de cores
     const color = d3.scaleOrdinal(d3.schemeCategory10);
 
     const simulation = d3.forceSimulation(data.nodes)
@@ -89,7 +80,7 @@ fetch('data/living-human-network-v2.1.json')
         .enter()
         .append("circle")
         .attr("r", 30)
-        .attr("fill", d => color(communityMap[d.id]))
+        .attr("fill", d => color(communities[d.id]))
         .attr("stroke", "#333")
         .attr("stroke-width", 2)
         .call(d3.drag()
@@ -142,6 +133,7 @@ fetch('data/living-human-network-v2.1.json')
     }
 
 });
+
 </script>
 
 </body>
