@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>LivingHumanNetwork</title>
 
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
 <style>
 body {
     margin: 0;
@@ -32,93 +34,50 @@ svg {
 
 <body>
 
-<div id="title">LivingHumanNetwork v3.0 — Analytical View</div>
+<div id="title">LivingHumanNetwork v3.1 — Stable Analytical View</div>
 <div id="metrics"></div>
 <svg width="900" height="600"></svg>
 
-<script type="module">
-
-import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
-import Graph from "https://cdn.jsdelivr.net/npm/graphology@0.25.1/+esm";
-import louvain from "https://cdn.jsdelivr.net/npm/graphology-communities-louvain@2.0.2/+esm";
-import betweenness from "https://cdn.jsdelivr.net/npm/graphology-metrics/centrality/betweenness/+esm";
+<script>
 
 const width = 900;
 const height = 600;
+
 const svg = d3.select("svg");
 
 fetch('data/living-human-network-v2.1.json')
 .then(response => response.json())
 .then(data => {
 
-    const graph = new Graph();
-
-    data.nodes.forEach(node => graph.addNode(node.id));
-    data.relationships.forEach(rel => graph.addEdge(rel.source, rel.target));
-
-    // Comunidades
-    const communities = louvain(graph);
-
     // Grau
-    const degreeCount = {};
-    data.nodes.forEach(node => degreeCount[node.id] = 0);
-    data.relationships.forEach(rel => {
-        degreeCount[rel.source] += 1;
-        degreeCount[rel.target] += 1;
+    const degree = {};
+    data.nodes.forEach(n => degree[n.id] = 0);
+    data.relationships.forEach(r => {
+        degree[r.source] += 1;
+        degree[r.target] += 1;
     });
 
-    const maxDegree = Math.max(...Object.values(degreeCount));
+    const maxDegree = Math.max(...Object.values(degree));
 
     const radiusScale = d3.scaleLinear()
         .domain([0, maxDegree])
         .range([20, 60]);
 
-    // Betweenness centrality
-    const between = betweenness(graph);
-
-    // Métricas globais
+    // Métricas simples
     const n = data.nodes.length;
     const m = data.relationships.length;
-    const density = ((2 * m) / (n * (n - 1))).toFixed(4);
-    const avgDegree = (Object.values(degreeCount).reduce((a,b)=>a+b,0)/n).toFixed(2);
-    const modularity = louvain.modularity(graph, communities).toFixed(4);
-    const communityCount = new Set(Object.values(communities)).size;
+    const density = ((2*m)/(n*(n-1))).toFixed(3);
+    const avgDegree = (Object.values(degree).reduce((a,b)=>a+b,0)/n).toFixed(2);
 
-    // Ranking Top 3 Grau
-    const topDegree = Object.entries(degreeCount)
-        .sort((a,b)=>b[1]-a[1])
-        .slice(0,3);
-
-    // Ranking Top 3 Betweenness
-    const topBetween = Object.entries(between)
-        .sort((a,b)=>b[1]-a[1])
-        .slice(0,3);
-
-    const idToLabel = {};
-    data.nodes.forEach(n => idToLabel[n.id] = n.label);
-
-    document.getElementById("metrics").innerHTML = `
-        Nodes: ${n} |
-        Edges: ${m} |
-        Communities: ${communityCount} |
-        Avg Degree: ${avgDegree} |
-        Density: ${density} |
-        Modularity: ${modularity}
-        <br><br>
-        Top Degree: ${topDegree.map(d => idToLabel[d[0]] + " (" + d[1] + ")").join(" | ")}
-        <br>
-        Top Bridges: ${topBetween.map(d => idToLabel[d[0]] + " (" + d[1].toFixed(3) + ")").join(" | ")}
-    `;
-
-    const color = d3.scaleOrdinal(d3.schemeCategory10);
+    document.getElementById("metrics").innerHTML =
+        `Nodes: ${n} | Edges: ${m} | Avg Degree: ${avgDegree} | Density: ${density}`;
 
     const simulation = d3.forceSimulation(data.nodes)
         .force("link", d3.forceLink(data.relationships)
             .id(d => d.id)
-            .distance(150)
-        )
+            .distance(150))
         .force("charge", d3.forceManyBody().strength(-400))
-        .force("center", d3.forceCenter(width / 2, height / 2));
+        .force("center", d3.forceCenter(width/2, height/2));
 
     const link = svg.append("g")
         .selectAll("line")
@@ -126,22 +85,21 @@ fetch('data/living-human-network-v2.1.json')
         .enter()
         .append("line")
         .attr("stroke", "#999")
-        .attr("stroke-width", d => d.weight ? d.weight * 5 : 2);
+        .attr("stroke-width", 2);
 
     const node = svg.append("g")
         .selectAll("circle")
         .data(data.nodes)
         .enter()
         .append("circle")
-        .attr("r", d => radiusScale(degreeCount[d.id]))
-        .attr("fill", d => color(communities[d.id]))
+        .attr("r", d => radiusScale(degree[d.id]))
+        .attr("fill", "#d4a017")
         .attr("stroke", "#333")
         .attr("stroke-width", 2)
         .call(d3.drag()
             .on("start", dragstarted)
             .on("drag", dragged)
-            .on("end", dragended)
-        );
+            .on("end", dragended));
 
     const labels = svg.append("g")
         .selectAll("text")
