@@ -1,241 +1,178 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v3.3 — Structural Resilience Layer</title>
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<title>LivingHumanNetwork v4.0 — Temporal Evolution Layer</title>
 <style>
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #d8cfb3;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #d8ccb0;
+  text-align: center;
 }
-h2 {
-    text-align: center;
-    margin-top: 20px;
+h1 {
+  margin-top: 20px;
 }
-#metrics {
-    text-align: center;
-    margin-bottom: 10px;
-    font-size: 14px;
+#controls {
+  margin: 10px;
 }
 svg {
-    display: block;
-    margin: auto;
+  background: #d8ccb0;
 }
 </style>
 </head>
 <body>
 
-<h2>LivingHumanNetwork v3.3 — Structural Resilience Layer</h2>
+<h1>LivingHumanNetwork v4.0 — Temporal Evolution</h1>
+
+<div id="controls">
+  <input type="range" id="timeSlider" min="0" max="1" step="1" value="0">
+  <span id="timeLabel">t = 0</span>
+</div>
+
 <div id="metrics"></div>
-<svg width="900" height="600"></svg>
+
+<svg id="network" width="800" height="600"></svg>
 
 <script>
 
-const width = 900;
-const height = 600;
-const svg = d3.select("svg");
+const timeline = [
+{
+  t:0,
+  nodes:[
+    {id:"001",label:"Mihail"},
+    {id:"002",label:"Natalia"}
+  ],
+  edges:[
+    {source:"002",target:"001"}
+  ]
+},
+{
+  t:1,
+  nodes:[
+    {id:"001",label:"Mihail"},
+    {id:"002",label:"Natalia"},
+    {id:"003",label:"Mentor"}
+  ],
+  edges:[
+    {source:"002",target:"001"},
+    {source:"003",target:"001"}
+  ]
+}
+];
 
-fetch('data/living-human-network-v2.1.json')
-.then(response => response.json())
-.then(data => {
+const slider = document.getElementById("timeSlider");
+slider.max = timeline.length - 1;
 
-    const nodes = data.nodes.map(n => n.id);
-    const edges = data.relationships;
-
-    // Degree
-    const degree = {};
-    nodes.forEach(n => degree[n] = 0);
-    edges.forEach(e => {
-        degree[e.source]++;
-        degree[e.target]++;
-    });
-
-    const maxDegree = Math.max(...Object.values(degree));
-    const radiusScale = d3.scaleLinear()
-        .domain([0, maxDegree])
-        .range([20, 60]);
-
-    // Adjacency
-    const adj = {};
-    nodes.forEach(n => adj[n] = []);
-    edges.forEach(e => {
-        adj[e.source].push(e.target);
-        adj[e.target].push(e.source);
-    });
-
-    // Betweenness (Brandes simplified)
-    const betweenness = {};
-    nodes.forEach(v => betweenness[v] = 0);
-
-    nodes.forEach(s => {
-
-        const stack = [];
-        const predecessors = {};
-        const sigma = {};
-        const dist = {};
-
-        nodes.forEach(v => {
-            predecessors[v] = [];
-            sigma[v] = 0;
-            dist[v] = -1;
-        });
-
-        sigma[s] = 1;
-        dist[s] = 0;
-
-        const queue = [s];
-
-        while(queue.length > 0) {
-            const v = queue.shift();
-            stack.push(v);
-
-            adj[v].forEach(w => {
-                if (dist[w] < 0) {
-                    queue.push(w);
-                    dist[w] = dist[v] + 1;
-                }
-                if (dist[w] === dist[v] + 1) {
-                    sigma[w] += sigma[v];
-                    predecessors[w].push(v);
-                }
-            });
-        }
-
-        const delta = {};
-        nodes.forEach(v => delta[v] = 0);
-
-        while(stack.length > 0) {
-            const w = stack.pop();
-            predecessors[w].forEach(v => {
-                delta[v] += (sigma[v] / sigma[w]) * (1 + delta[w]);
-            });
-            if (w !== s) betweenness[w] += delta[w];
-        }
-    });
-
-    const maxBetween = Math.max(...Object.values(betweenness));
-    const colorScale = d3.scaleLinear()
-        .domain([0, maxBetween])
-        .range(["#6baed6", "#cb181d"]);
-
-    // Clustering coefficient
-    function clusteringCoefficient(node) {
-        const neighbors = adj[node];
-        const k = neighbors.length;
-        if (k < 2) return 0;
-
-        let links = 0;
-        for (let i = 0; i < k; i++) {
-            for (let j = i + 1; j < k; j++) {
-                if (adj[neighbors[i]].includes(neighbors[j])) {
-                    links++;
-                }
-            }
-        }
-        return (2 * links) / (k * (k - 1));
-    }
-
-    const clusteringValues = nodes.map(n => clusteringCoefficient(n));
-    const avgClustering = (
-        clusteringValues.reduce((a,b)=>a+b,0) / nodes.length
-    ).toFixed(3);
-
-    // Robustness test
-    const mostCentral = nodes.reduce((a,b) =>
-        betweenness[a] > betweenness[b] ? a : b
-    );
-
-    function countComponents(excludeNode = null) {
-        const visited = new Set();
-        let components = 0;
-
-        nodes.forEach(n => {
-            if (n !== excludeNode && !visited.has(n)) {
-                components++;
-                const stack = [n];
-                visited.add(n);
-
-                while(stack.length > 0) {
-                    const v = stack.pop();
-                    adj[v].forEach(w => {
-                        if (w !== excludeNode && !visited.has(w)) {
-                            visited.add(w);
-                            stack.push(w);
-                        }
-                    });
-                }
-            }
-        });
-
-        return components;
-    }
-
-    const componentsBefore = countComponents();
-    const componentsAfter = countComponents(mostCentral);
-
-    const n = nodes.length;
-    const m = edges.length;
-    const density = n > 1 ? ((2*m)/(n*(n-1))).toFixed(3) : 0;
-    const avgDegree = (Object.values(degree).reduce((a,b)=>a+b,0)/n).toFixed(2);
-
-    document.getElementById("metrics").innerHTML =
-        `Nodes: ${n} | Edges: ${m} | Avg Degree: ${avgDegree} | Density: ${density}
-         | Avg Clustering: ${avgClustering}
-         | Components: ${componentsBefore}
-         | Components After Removing Most Central (${mostCentral}): ${componentsAfter}`;
-
-    const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(edges).id(d => d.id).distance(150))
-        .force("charge", d3.forceManyBody().strength(-400))
-        .force("center", d3.forceCenter(width/2, height/2));
-
-    const link = svg.append("g")
-        .selectAll("line")
-        .data(edges)
-        .enter()
-        .append("line")
-        .attr("stroke", "#999")
-        .attr("stroke-width", 2);
-
-    const node = svg.append("g")
-        .selectAll("circle")
-        .data(data.nodes)
-        .enter()
-        .append("circle")
-        .attr("r", d => radiusScale(degree[d.id]))
-        .attr("fill", d => colorScale(betweenness[d.id]))
-        .attr("stroke", "#333")
-        .attr("stroke-width", 2);
-
-    const labels = svg.append("g")
-        .selectAll("text")
-        .data(data.nodes)
-        .enter()
-        .append("text")
-        .text(d => d.label)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 12)
-        .attr("font-weight", "bold");
-
-    simulation.on("tick", () => {
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
-
-        node
-            .attr("cx", d => d.x)
-            .attr("cy", d => d.y);
-
-        labels
-            .attr("x", d => d.x)
-            .attr("y", d => d.y + 4);
-    });
-
+slider.addEventListener("input", () => {
+  document.getElementById("timeLabel").innerText = "t = " + slider.value;
+  render(parseInt(slider.value));
 });
+
+function calculateMetrics(nodes, edges) {
+  const degree = {};
+  nodes.forEach(n => degree[n.id] = 0);
+  edges.forEach(e => {
+    degree[e.source]++;
+    degree[e.target]++;
+  });
+
+  const n = nodes.length;
+  const m = edges.length;
+  const avgDegree = (2*m)/n;
+  const density = n > 1 ? (2*m)/(n*(n-1)) : 0;
+
+  return {degree, avgDegree, density};
+}
+
+function betweenness(nodes, edges) {
+  const score = {};
+  nodes.forEach(n => score[n.id] = 0);
+
+  nodes.forEach(n => {
+    nodes.forEach(m => {
+      if(n.id !== m.id) {
+        edges.forEach(e => {
+          if(e.source === n.id && e.target === m.id) {
+            score[n.id] += 1;
+          }
+        });
+      }
+    });
+  });
+
+  return score;
+}
+
+function render(tIndex) {
+
+  const data = timeline[tIndex];
+  const svg = document.getElementById("network");
+  svg.innerHTML = "";
+
+  const {degree, avgDegree, density} = calculateMetrics(data.nodes, data.edges);
+  const btw = betweenness(data.nodes, data.edges);
+
+  const centerX = 400;
+  const centerY = 300;
+  const radius = 150;
+
+  data.nodes.forEach((node, i) => {
+    const angle = (i / data.nodes.length) * 2 * Math.PI;
+    node.x = centerX + radius * Math.cos(angle);
+    node.y = centerY + radius * Math.sin(angle);
+  });
+
+  data.edges.forEach(e => {
+    const source = data.nodes.find(n => n.id === e.source);
+    const target = data.nodes.find(n => n.id === e.target);
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", source.x);
+    line.setAttribute("y1", source.y);
+    line.setAttribute("x2", target.x);
+    line.setAttribute("y2", target.y);
+    line.setAttribute("stroke","#555");
+    line.setAttribute("stroke-width","2");
+    svg.appendChild(line);
+  });
+
+  data.nodes.forEach(node => {
+    const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
+
+    const size = 20 + (degree[node.id] * 15);
+    const colorIntensity = Math.min(255, btw[node.id]*120);
+    const color = `rgb(${colorIntensity},0,255-${colorIntensity})`;
+
+    circle.setAttribute("cx", node.x);
+    circle.setAttribute("cy", node.y);
+    circle.setAttribute("r", size);
+    circle.setAttribute("fill", color);
+    circle.setAttribute("stroke","#333");
+    circle.setAttribute("stroke-width","2");
+
+    svg.appendChild(circle);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg","text");
+    text.setAttribute("x", node.x);
+    text.setAttribute("y", node.y+5);
+    text.setAttribute("text-anchor","middle");
+    text.setAttribute("font-size","12");
+    text.setAttribute("fill","#000");
+    text.textContent = node.label;
+    svg.appendChild(text);
+  });
+
+  document.getElementById("metrics").innerHTML =
+    "Nodes: " + data.nodes.length +
+    " | Edges: " + data.edges.length +
+    " | Avg Degree: " + avgDegree.toFixed(2) +
+    " | Density: " + density.toFixed(3);
+}
+
+render(0);
+
 </script>
+
 </body>
 </html>
