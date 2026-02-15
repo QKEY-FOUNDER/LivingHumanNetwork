@@ -25,7 +25,7 @@ body {
 }
 
 .relation {
-    margin: 5px 0;
+    margin: 6px 0;
     font-size: 14px;
 }
 </style>
@@ -35,8 +35,10 @@ body {
 
 <div id="container">
     <h1>LivingHumanNetwork v2.1</h1>
+
     <h2>Nodes</h2>
     <div id="nodes"></div>
+
     <h2>Relationships</h2>
     <div id="relationships"></div>
 </div>
@@ -69,10 +71,12 @@ fetch('data/living-human-network-v2.1.json')
             const sourceLabel = sourceNode ? sourceNode.label : rel.source;
             const targetLabel = targetNode ? targetNode.label : rel.target;
 
+            const weightPercent = Math.round(rel.weight * 100);
+
             relationDiv.innerHTML =
-                sourceLabel + " → " + targetLabel +
+                "<strong>" + sourceLabel + "</strong> → <strong>" + targetLabel + "</strong>" +
                 " | type: " + rel.type +
-                " | weight: " + rel.weight;
+                " | influence: " + weightPercent + "%";
 
             relationshipsContainer.appendChild(relationDiv);
         });
