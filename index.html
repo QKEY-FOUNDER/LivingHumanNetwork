@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v4.0 — Temporal Evolution Layer</title>
+<title>LivingHumanNetwork v4.0 — Temporal Evolution</title>
 <style>
 body {
   margin: 0;
@@ -10,15 +10,9 @@ body {
   background: #d8ccb0;
   text-align: center;
 }
-h1 {
-  margin-top: 20px;
-}
-#controls {
-  margin: 10px;
-}
-svg {
-  background: #d8ccb0;
-}
+h1 { margin-top: 20px; }
+#controls { margin: 10px; }
+svg { background: #d8ccb0; }
 </style>
 </head>
 <body>
@@ -79,22 +73,22 @@ function calculateMetrics(nodes, edges) {
 
   const n = nodes.length;
   const m = edges.length;
-  const avgDegree = (2*m)/n;
+  const avgDegree = n > 0 ? (2*m)/n : 0;
   const density = n > 1 ? (2*m)/(n*(n-1)) : 0;
 
   return {degree, avgDegree, density};
 }
 
-function betweenness(nodes, edges) {
+function calculateBetweenness(nodes, edges) {
   const score = {};
   nodes.forEach(n => score[n.id] = 0);
 
-  nodes.forEach(n => {
-    nodes.forEach(m => {
-      if(n.id !== m.id) {
+  nodes.forEach(a => {
+    nodes.forEach(b => {
+      if(a.id !== b.id) {
         edges.forEach(e => {
-          if(e.source === n.id && e.target === m.id) {
-            score[n.id] += 1;
+          if(e.source === a.id && e.target === b.id) {
+            score[a.id] += 1;
           }
         });
       }
@@ -104,6 +98,17 @@ function betweenness(nodes, edges) {
   return score;
 }
 
+function normalize(values) {
+  const arr = Object.values(values);
+  const max = Math.max(...arr);
+  if(max === 0) return values;
+  const normalized = {};
+  for(let k in values) {
+    normalized[k] = values[k] / max;
+  }
+  return normalized;
+}
+
 function render(tIndex) {
 
   const data = timeline[tIndex];
@@ -111,11 +116,12 @@ function render(tIndex) {
   svg.innerHTML = "";
 
   const {degree, avgDegree, density} = calculateMetrics(data.nodes, data.edges);
-  const btw = betweenness(data.nodes, data.edges);
+  let btw = calculateBetweenness(data.nodes, data.edges);
+  btw = normalize(btw);
 
   const centerX = 400;
   const centerY = 300;
-  const radius = 150;
+  const radius = 160;
 
   data.nodes.forEach((node, i) => {
     const angle = (i / data.nodes.length) * 2 * Math.PI;
@@ -138,11 +144,16 @@ function render(tIndex) {
   });
 
   data.nodes.forEach(node => {
+
     const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
 
-    const size = 20 + (degree[node.id] * 15);
-    const colorIntensity = Math.min(255, btw[node.id]*120);
-    const color = `rgb(${colorIntensity},0,255-${colorIntensity})`;
+    const size = 25 + (degree[node.id] * 18);
+
+    const influence = btw[node.id] || 0;
+    const red = Math.floor(255 * influence);
+    const blue = 180 - Math.floor(150 * influence);
+
+    const color = `rgb(${red},50,${blue})`;
 
     circle.setAttribute("cx", node.x);
     circle.setAttribute("cy", node.y);
