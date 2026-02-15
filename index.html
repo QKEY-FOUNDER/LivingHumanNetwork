@@ -2,195 +2,220 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>LivingHumanNetwork v4.1 — Hybrid Analytical Engine</title>
+<title>LivingHumanNetwork v4.3 — Generational Power Shift Model</title>
 <style>
-body { margin:0; font-family:Arial; background:#d8cfb0; }
-h2 { text-align:center; margin:20px 0 5px; }
-.metrics { text-align:center; font-size:12px; margin-bottom:10px; }
+body { margin:0; font-family:Arial; background:#d8cdb0; text-align:center; }
+h1 { margin-top:20px; }
+#metrics { margin:10px; font-size:14px; }
+svg { background:#d8cdb0; }
 </style>
 </head>
 <body>
 
-<h2>LivingHumanNetwork v4.1 — Hybrid Analytical Engine</h2>
-<div class="metrics" id="metrics"></div>
-<svg id="network" width="100%" height="600"></svg>
+<h1>LivingHumanNetwork v4.3 — Generational Power Shift</h1>
+<div id="metrics"></div>
+<svg id="network" width="900" height="600"></svg>
 
 <script>
 
-const data = {
-  nodes: [
-    { id: "001", name: "Mihail", time: 0 },
-    { id: "002", name: "Natalia", time: 0 }
-  ],
-  links: [
-    { source: "001", target: "002", time: 0 }
-  ]
+const nodes = [
+{ id:"M", name:"Mihail" },
+{ id:"N", name:"Natalia" },
+{ id:"V", name:"Vladislav" },
+{ id:"P", name:"Paulo" },
+{ id:"C", name:"CHIOSS REALTY" }
+];
+
+const edges = [
+{ source:"M", target:"N" },
+{ source:"N", target:"V" },
+{ source:"M", target:"V" },
+{ source:"N", target:"P" },
+{ source:"M", target:"P" },
+{ source:"V", target:"C" },
+{ source:"P", target:"C" },
+{ source:"C", target:"M" }
+];
+
+function buildAdj(){
+let adj = {};
+nodes.forEach(n=>adj[n.id]=[]);
+edges.forEach(e=>{
+adj[e.source].push(e.target);
+adj[e.target].push(e.source);
+});
+return adj;
+}
+
+function degree(id){
+return edges.filter(e=>e.source===id||e.target===id).length;
+}
+
+function betweenness(){
+let adj = buildAdj();
+let CB = {};
+nodes.forEach(n=>CB[n.id]=0);
+
+if(nodes.length<3) return CB;
+
+nodes.forEach(s=>{
+let S=[], P={}, sigma={}, d={}, Q=[];
+nodes.forEach(v=>{
+P[v.id]=[];
+sigma[v.id]=0;
+d[v.id]=-1;
+});
+sigma[s.id]=1;
+d[s.id]=0;
+Q.push(s.id);
+
+while(Q.length){
+let v=Q.shift();
+S.push(v);
+adj[v].forEach(w=>{
+if(d[w]<0){
+Q.push(w);
+d[w]=d[v]+1;
+}
+if(d[w]===d[v]+1){
+sigma[w]+=sigma[v];
+P[w].push(v);
+}
+});
+}
+
+let delta={};
+nodes.forEach(v=>delta[v.id]=0);
+
+while(S.length){
+let w=S.pop();
+P[w].forEach(v=>{
+delta[v]+= (sigma[v]/sigma[w])*(1+delta[w]);
+});
+if(w!==s.id){
+CB[w]+=delta[w];
+}
+}
+});
+
+let norm=1/((nodes.length-1)*(nodes.length-2));
+nodes.forEach(n=>CB[n.id]*=norm);
+
+return CB;
+}
+
+function countComponents(exclude=null){
+let adj=buildAdj();
+let visited=new Set();
+let components=0;
+
+nodes.forEach(n=>{
+if(n.id!==exclude && !visited.has(n.id)){
+components++;
+let stack=[n.id];
+while(stack.length){
+let v=stack.pop();
+if(!visited.has(v)){
+visited.add(v);
+adj[v].forEach(w=>{
+if(w!==exclude && !visited.has(w)){
+stack.push(w);
+}
+});
+}
+}
+}
+});
+
+return components;
+}
+
+function clustering(){
+let adj=buildAdj();
+let total=0;
+
+nodes.forEach(n=>{
+let neighbors=adj[n.id];
+let k=neighbors.length;
+if(k<2) return;
+let links=0;
+for(let i=0;i<k;i++){
+for(let j=i+1;j<k;j++){
+if(adj[neighbors[i]].includes(neighbors[j])) links++;
+}
+}
+total+= (2*links)/(k*(k-1));
+});
+
+return (total/nodes.length);
+}
+
+function draw(){
+
+let svg=document.getElementById("network");
+svg.innerHTML="";
+
+let positions={
+M:{x:450,y:250},
+N:{x:250,y:250},
+V:{x:250,y:450},
+P:{x:650,y:450},
+C:{x:650,y:250}
 };
 
-function buildGraph(nodes, links){
-  const adj = {};
-  nodes.forEach(n => adj[n.id] = []);
-  links.forEach(l => {
-    adj[l.source].push(l.target);
-    adj[l.target].push(l.source);
-  });
-  return adj;
+edges.forEach(e=>{
+let line=document.createElementNS("http://www.w3.org/2000/svg","line");
+line.setAttribute("x1",positions[e.source].x);
+line.setAttribute("y1",positions[e.source].y);
+line.setAttribute("x2",positions[e.target].x);
+line.setAttribute("y2",positions[e.target].y);
+line.setAttribute("stroke","#555");
+line.setAttribute("stroke-width","2");
+svg.appendChild(line);
+});
+
+let btw=betweenness();
+let maxB=Math.max(...Object.values(btw));
+
+nodes.forEach(n=>{
+let r=20+degree(n.id)*8;
+let intensity=maxB===0?0:btw[n.id]/maxB;
+let red=Math.floor(255*intensity);
+let blue=255-red;
+
+let circle=document.createElementNS("http://www.w3.org/2000/svg","circle");
+circle.setAttribute("cx",positions[n.id].x);
+circle.setAttribute("cy",positions[n.id].y);
+circle.setAttribute("r",r);
+circle.setAttribute("fill","rgb("+red+",0,"+blue+")");
+circle.setAttribute("stroke","#222");
+circle.setAttribute("stroke-width","2");
+svg.appendChild(circle);
+
+let text=document.createElementNS("http://www.w3.org/2000/svg","text");
+text.setAttribute("x",positions[n.id].x);
+text.setAttribute("y",positions[n.id].y+4);
+text.setAttribute("text-anchor","middle");
+text.setAttribute("fill","#fff");
+text.setAttribute("font-size","12");
+text.textContent=n.name;
+svg.appendChild(text);
+});
+
+let mostCentral=nodes.reduce((a,b)=>btw[a.id]>btw[b.id]?a:b);
+let frag=countComponents(mostCentral.id);
+
+document.getElementById("metrics").innerHTML=
+"Nodes: "+nodes.length+
+" | Edges: "+edges.length+
+" | Density: "+((2*edges.length)/(nodes.length*(nodes.length-1))).toFixed(3)+
+" | Avg Clustering: "+clustering().toFixed(3)+
+" | Most Central: "+mostCentral.name+
+" | Components After Removal: "+frag;
 }
 
-function computeDegree(adj){
-  const degree = {};
-  Object.keys(adj).forEach(id => degree[id] = adj[id].length);
-  return degree;
-}
-
-// Brandes Simplified for small graphs
-function computeBetweenness(nodes, adj){
-
-  const CB = {};
-  nodes.forEach(n => CB[n.id] = 0);
-
-  if(nodes.length < 3) return CB;
-
-  nodes.forEach(s => {
-
-    const S = [];
-    const P = {};
-    const sigma = {};
-    const d = {};
-    const Q = [];
-
-    nodes.forEach(v => {
-      P[v.id] = [];
-      sigma[v.id] = 0;
-      d[v.id] = -1;
-    });
-
-    sigma[s.id] = 1;
-    d[s.id] = 0;
-    Q.push(s.id);
-
-    while(Q.length){
-      const v = Q.shift();
-      S.push(v);
-
-      adj[v].forEach(w => {
-        if(d[w] < 0){
-          Q.push(w);
-          d[w] = d[v] + 1;
-        }
-        if(d[w] === d[v] + 1){
-          sigma[w] += sigma[v];
-          P[w].push(v);
-        }
-      });
-    }
-
-    const delta = {};
-    nodes.forEach(v => delta[v.id] = 0);
-
-    while(S.length){
-      const w = S.pop();
-      P[w].forEach(v => {
-        delta[v] += (sigma[v]/sigma[w]) * (1 + delta[w]);
-      });
-      if(w !== s.id){
-        CB[w] += delta[w];
-      }
-    }
-
-  });
-
-  // normalização
-  const norm = 1 / ((nodes.length-1)*(nodes.length-2));
-  Object.keys(CB).forEach(id => CB[id] *= norm);
-
-  return CB;
-}
-
-function render(){
-
-  const svg = document.getElementById("network");
-  svg.innerHTML = "";
-
-  const adj = buildGraph(data.nodes, data.links);
-  const degree = computeDegree(adj);
-  const betweenness = computeBetweenness(data.nodes, adj);
-
-  const maxDegree = Math.max(...Object.values(degree));
-  const maxBet = Math.max(...Object.values(betweenness));
-
-  const width = svg.clientWidth;
-  const height = svg.clientHeight;
-
-  const cx = width/2;
-  const spacing = 200;
-
-  const positions = {};
-  data.nodes.forEach((n,i)=>{
-    positions[n.id] = {
-      x: cx + (i===0 ? -spacing/2 : spacing/2),
-      y: height/2
-    };
-  });
-
-  data.links.forEach(l=>{
-    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    line.setAttribute("x1", positions[l.source].x);
-    line.setAttribute("y1", positions[l.source].y);
-    line.setAttribute("x2", positions[l.target].x);
-    line.setAttribute("y2", positions[l.target].y);
-    line.setAttribute("stroke","#555");
-    line.setAttribute("stroke-width","2");
-    svg.appendChild(line);
-  });
-
-  data.nodes.forEach(n=>{
-
-    const r = 20 + (degree[n.id]/maxDegree)*40;
-
-    let color = "#2e6da4";
-    if(maxBet > 0){
-      const intensity = betweenness[n.id]/maxBet;
-      const red = Math.floor(255*intensity);
-      const blue = Math.floor(255*(1-intensity));
-      color = `rgb(${red},0,${blue})`;
-    }
-
-    const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
-    circle.setAttribute("cx", positions[n.id].x);
-    circle.setAttribute("cy", positions[n.id].y);
-    circle.setAttribute("r", r);
-    circle.setAttribute("fill", color);
-    circle.setAttribute("stroke","#222");
-    circle.setAttribute("stroke-width","2");
-
-    svg.appendChild(circle);
-
-    const label = document.createElementNS("http://www.w3.org/2000/svg","text");
-    label.setAttribute("x", positions[n.id].x);
-    label.setAttribute("y", positions[n.id].y+4);
-    label.setAttribute("text-anchor","middle");
-    label.setAttribute("fill","#fff");
-    label.setAttribute("font-size","12");
-    label.textContent = n.name;
-
-    svg.appendChild(label);
-
-  });
-
-  document.getElementById("metrics").innerText =
-    "Nodes: " + data.nodes.length +
-    " | Edges: " + data.links.length +
-    " | Avg Degree: " +
-    (Object.values(degree).reduce((a,b)=>a+b,0)/data.nodes.length).toFixed(2) +
-    " | Density: " +
-    ( (2*data.links.length)/(data.nodes.length*(data.nodes.length-1)) ).toFixed(3);
-
-}
-
-render();
+draw();
 
 </script>
-
 </body>
 </html>
